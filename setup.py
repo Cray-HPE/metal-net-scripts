@@ -48,7 +48,8 @@ setup(
         ],
     },
     scripts=[
-        'bin/hello_world.py',
+        'bin/aruba_set_bgp_peers.py',
+        'bin/mellanox_set_bgp_peers.py',
     ],
     packages=find_packages(),
     include_package_data=True,
