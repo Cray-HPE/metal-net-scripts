@@ -1,1 +1,8 @@
 *.pyc
+/dist/
+/build/
+/.eggs/
+*.egg-info
+*.egg
+*.tox
+**/*coverage*
