@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-#required commands to be run on switch prior to running this script.
-# ssh server vrf default
-# ssh server vrf mgmt
-# https-server vrf default
-# https-server vrf mgmt
-# https-server rest access-mode read-write
+# To enable json api on switch:
+# switch (config) # json-gw enable
+
+# https://community.mellanox.com/s/article/getting-started-with-json-api-for-mellanox-switches
+# JSON LOGIN:  https://docs.mellanox.com/display/ONYXv382110/Network+Management+Interfaces
+
 
 import yaml
 import requests
@@ -14,7 +14,7 @@ import pprint
 import sys
 import json
 import getpass
-import logging
+import logging 
 import os
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -27,7 +27,7 @@ USAGE: - <IP of switch 1> <IP of Switch 2> <Path to CSI generated network files>
 
        - The path must include CAN.yaml', 'HMN.yaml', 'HMNLB.yaml', 'NMNLB.yaml', 'NMN.yaml
 
-Example: ./aruba_set_bgp_peers.py 10.252.0.2 10.252.0.3 /var/www/ephemeral/prep/redbull/networks
+Example: ./mellanox_set_bgp_peers.py 10.252.0.2 10.252.0.3 /var/www/ephemeral/prep/redbull/networks
 """
 
 # take in switch IP and path as arguments
@@ -55,63 +55,11 @@ for entry in net_file_list:
 if len(missing_files) > 0:
         print('Missing {} in directory, please verify {} are all located inside the directory'.format(', '.join(missing_files), ', '.join(net_file_list)))
         sys.exit()
-        
+
 switch_ips = [switch1, switch2]
 
 username = 'admin'
 password = getpass.getpass("Switch Password: ")
-
-def _response_ok(response, call_type):
-    """
-    Checks whether API HTTP response contains the associated OK code.
-    :param response: Response object
-    :param call_type: String containing the HTTP request type
-    :return: True if response was OK, False otherwise
-    """
-    ok_codes = {
-        "GET": [200],
-        "PUT": [200, 204],
-        "POST": [201, 268],
-        "DELETE": [204]
-    }
-
-    return response.status_code in ok_codes[call_type]
-
-def remote_delete(remote_url, data=None, verify=False):
-    response = session.delete(remote_url)
-    if not _response_ok(response, "DELETE"):
-        logging.warning("FAIL")
-        return False
-    else:
-        logging.info("SUCCESS")
-        return True
-
-def remote_get(remote_url, data=None, verify=False):
-    response = session.get(remote_url)
-    if not _response_ok(response, "GET"):
-        logging.warning("FAIL")
-        return False
-    else:
-        logging.info("SUCCESS")
-    return response
-
-def remote_post(remote_url, data=None):
-    response = session.post(remote_url, json=data, verify=False)
-    if not _response_ok(response, "POST"):
-        logging.warning("FAIL")
-        return False
-    else:
-        logging.info("SUCCESS")
-    return response
-
-def remote_put(remote_url, data=None):
-    response = session.put(remote_url, json=data, verify=False)
-    if not _response_ok(response, "PUT"):
-        logging.warning("FAIL")
-        return False
-    else:
-        logging.info("SUCCESS")
-    return response
 
 with open(path + '/NMN.yaml', 'r') as f:
     NMN = yaml.full_load(f)
@@ -137,6 +85,8 @@ HMN_prefix=(HMNLB['cidr'])
 NMN_prefix=(NMNLB['cidr'])
 
 asn=65533
+
+url = 'fhttps://{ips}/rest/v10.04/system/'
 
 ncn_nmn_ips = []
 ncn_names = []
@@ -177,235 +127,133 @@ for i in range(len(HMN['subnets'][1]['ip_reservations'])):
         ncn_hmn_ips.append(ips)
 print('ncn hmn ips:' ,' '.join(ncn_hmn_ips))
 
-for i in range(len(NMN['subnets'][0]['ip_reservations'])):
-    switches = NMN['subnets'][0]['ip_reservations'][i]['name']
-    if 'spine' in switches:
-            ips = (NMN['subnets'][0]['ip_reservations'][i]['ip_address'])
-#            switch_ips.append(ips)
+#get switch IPs
+# for i in range(len(NMN['subnets'][0]['ip_reservations'])):
+#     switches = NMN['subnets'][0]['ip_reservations'][i]['name']
+#     if 'spine' in switches:
+#             ips = (NMN['subnets'][0]['ip_reservations'][i]['ip_address'])
+#             switch_ips.append(ips)
 print('switch ips' ,' '.join(switch_ips))
 print('===============================================')
 
-#json payload
-bgp_data = {
-    'asn': asn,
-    'router_id': ''
-}
 
-bgp_neighbor10_05 = {
-	"ip_or_group_name": "",
-	"remote_as": asn,
-	"route_maps": {
-		"ipv4-unicast": {
-			"in": ""
-		}
-	},
-	"shutdown": False,
-	"activate": {
-		"ipv4-unicast": True
-	}
-}
+login_body = {"username": "admin", "password": password } # JSON object
 
-bgp_neighbor10_06 = {
-	"ip_or_ifname_or_group_name": "",
-	"remote_as": asn,
-	"route_maps": {
-		"ipv4-unicast": {
-			"in": ""
-		}
-	},
-	"shutdown": False,
-	"activate": {
-		"ipv4-unicast": True
-	}
-}
+for spine in switch_ips:
+    login_url = "https://{}/admin/launch?script=rh&template=json-request&action=json-login".format(spine)
 
-prefix = ['pl-can', 'pl-hmn', 'pl-nmn']
+    session = requests.session()
+#create a session and get the session ID cookie
+    response = session.post(url = login_url, json = login_body, verify = False) # Do not verify self-signed certs
+    response.raise_for_status() # Throw an exception if HTTP response is not 200
 
-prefix_list_entry = {
-  'action': 'permit',
-  'ge': 24,
-  'le': 0,
-  'preference': 10,
-  'prefix': ''
-}
+    response_body = json.loads(response.text) # Convert JSON to python object
+    if not response.text or \
+        'status' not in response_body or \
+        response_body['status'] != 'OK':
+        print('Error {}'.format(response.text))
+        sys.exit()
 
-prefix_list = {
-  'address_family': 'ipv4',
-  'name': ''
-}
+    # If the above passes then we're logged in and session cookie is available
+    # NOTE:  technically the session cookie is still in our open requests session!
+    session_tuple = ()
+    for item in  session.cookies.items():
+        if 'session' in item:
+            session_tuple = item
 
-route_map = {
-  'name': ''
-}
+    if not session_tuple:
+        print('Error no session ID returned or found')
+        sys.exit()
 
-route_map_entry_nmn = {
-    'action': 'permit',
-    'match_ipv4_prefix_list': {
-        'pl-can': '/rest/v10.04/system/prefix_lists/pl-nmn'
-    },
-    'preference': 10,
-    'set': {
-        'ipv4_next_hop_address': ''
-    }
-}
-
-route_map_entry_hmn = {
-    'action': 'permit',
-    'match_ipv4_prefix_list': {
-        'pl-hmn': '/rest/v10.04/system/prefix_lists/pl-hmn'
-    },
-    'preference': 20,
-    'set': {
-        'ipv4_next_hop_address': ''
-    }
-}
-
-route_map_entry_can = {
-    'action': 'permit',
-    'match_ipv4_prefix_list': {
-        'pl-can': '/rest/v10.04/system/prefix_lists/pl-can'
-    },
-    'preference': 30,
-    'set': {
-        'ipv4_next_hop_address': ''
-    }
-}
-
-username = 'admin'
-#password = 
-creds = {'username': username, 'password': password}
-version = 'v10.04'
+    #default url to post commands
+    action = '/admin/launch?script=rh&template=json-request&action=json-login'
 
 
+#get route-map configuration
+    cmd = {"cmd": 'show route-map'}
+    response = session.post(url = login_url + action, json = cmd, verify = False)
 
-session = requests.Session()
+#create command to delete previous route-map configuration.
+    switch_response = json.loads(response.text)
+    cmd_no_route_map_list=['no router bgp 65533'] #add a command to delete bgp config at the beginning of the list
+    for i in range(len(switch_response['data'])):
+        route_map = str(switch_response['data'][i])
+        route_map = (" ".join(route_map.split()[0:2]))
+        route_map = route_map[2:-1]
+        cmd_no_route_map = 'no {}'.format(route_map)
+        if cmd_no_route_map not in cmd_no_route_map_list:
+            cmd_no_route_map_list.append(cmd_no_route_map)
+    print(cmd_no_route_map_list)
 
-for ips in switch_ips:
-    base_url = 'https://{0}/rest/{1}/'.format(ips, version)
-    try:
-        response = session.post(base_url + 'login', data=creds, verify=False, timeout=5)
-    except requests.exceptions.ConnectTimeout:
-        logging.warning('ERROR: Error connecting to host: connection attempt timed out.  Verify the switch IPs')
-        exit(-1)
-    # Response OK check needs to be passed "PUT" since this POST call returns 200 instead of conventional 201
-    if not _response_ok(response, "PUT"):
-        logging.warning("FAIL: Login failed with status code %d: %s" % (response.status_code, response.text))
-        exit(-1)
-    else:
-        logging.info("SUCCESS: Login succeeded")
+    #posts NO route maps to the switch
+    cmd = {"commands": cmd_no_route_map_list}
+    response = session.post(url = login_url + action, json = cmd, verify = False)
+    post_cmd_url = login_url + action
+    switch_response = json.loads(response.text)
+    pprint.pprint(switch_response)
 
-    #remove bgp config
-    bgp_url = base_url + 'system/vrfs/default/bgp_routers/65533'
-    response = remote_delete(bgp_url)
 
-    #get prefix lists
-    prefix_url = base_url + 'system/prefix_lists'
-    response = remote_get(prefix_url)
-    pre_list = response.json()
+#create command to delete previous prefix list configuraiton.
+#these are hard coded, the API does not return prefix lists when called...
+    #delete prefix lists
+    get_prefix_list = ['no ip prefix-list pl-can', 'no ip prefix-list pl-hmn', 'no ip prefix-list pl-nmn']
+    cmd = {"commands": get_prefix_list}
+    response = session.post(url = login_url + action, json = cmd, verify = False)
+    switch_response = json.loads(response.text)
+    pprint.pprint(switch_response)
+    
 
-    #remove prefix lists
-    for pf in pre_list:
-        print('removing prefix_list: {0} from {1}'.format(pf, ips))
-        response = remote_delete(prefix_url + '/' + pf)
+#define the switch prefix list commands
+    cmd_prefix_list_nmn = "ip prefix-list pl-nmn seq 10 permit {} /24 ge 24".format(NMN_prefix[:-3])
+    cmd_prefix_list_hmn = "ip prefix-list pl-hmn seq 20 permit {} /24 ge 24".format(HMN_prefix[:-3])
+    cmd_prefix_list_can = "ip prefix-list pl-can seq 30 permit {} /24 ge 24".format(CAN_prefix[:-3])
 
-    #remove route map config
-    route_map_url = base_url + 'system/route_maps'
-    response = remote_get(route_map_url)
-    route_map1 = response.json()
 
-    for rm in route_map1:
-        print('removing route-map: {0} from {1}'.format(rm, ips))
-        response = remote_delete(route_map_url + '/' + rm)
+    cmd_list = [cmd_prefix_list_can, cmd_prefix_list_hmn, cmd_prefix_list_nmn]
 
-    #add prefix lists
-    for p in prefix:
-        prefix_list['name'] = p
-        print('adding prefix lists to {0}'.format(ips))
-        response = remote_post(prefix_url, prefix_list)
-        prefix_list_entry_url = base_url + 'system/prefix_lists/{0}/prefix_list_entries'.format(p)
-
-        if 'pl-can' in p:
-            prefix_list_entry['prefix'] = CAN_prefix
-            prefix_list_entry['preference'] = 10
-            response = remote_post(prefix_list_entry_url, prefix_list_entry)
-
-        if 'pl-hmn' in p:
-            prefix_list_entry['prefix'] = HMN_prefix
-            prefix_list_entry['preference'] = 20
-            response = remote_post(prefix_list_entry_url, prefix_list_entry)            
-
-        if 'pl-nmn' in p:
-            prefix_list_entry['prefix'] = NMN_prefix
-            prefix_list_entry['preference'] = 30
-            response = remote_post(prefix_list_entry_url, prefix_list_entry)
-
-    #create route maps
+    #create route_map commands
     for name in ncn_names:
-        route_map_entry_url = base_url + 'system/route_maps/{0}/route_map_entries'.format(name)
-        route_map['name'] = name
-        response = remote_post(route_map_url, route_map)
-        print('adding route-maps to {0}'.format(ips))
+        for name, ip in zip(ncn_names, ncn_nmn_ips):
+            route_map_nmn = "route-map {} permit 10 match ip address pl-nmn".format(name)
+            cmd_list.append(route_map_nmn)
+            route_map_nmn_ip = "route-map {} permit 10 set ip next-hop {}".format(name, ip)
+            cmd_list.append(route_map_nmn_ip)
 
-    for ncn, name in zip(ncn_can_ips, ncn_names):
-        route_map_entry_can['set']['ipv4_next_hop_address'] = ncn
-        route_map_can_url = base_url + 'system/route_maps/{0}/route_map_entries'.format(name)
-        response = remote_post(route_map_can_url, route_map_entry_can)
+        for name, ip in zip(ncn_names, ncn_hmn_ips):        
+            route_map_hmn = "route-map {} permit 20 match ip address pl-hmn".format(name)
+            cmd_list.append(route_map_hmn)
+            route_map_hmn_ip = "route-map {} permit 20 set ip next-hop {}".format(name, ip)
+            cmd_list.append(route_map_hmn_ip)
 
-    for ncn, name in zip(ncn_hmn_ips, ncn_names):
-        route_map_entry_hmn['set']['ipv4_next_hop_address'] = ncn
-        route_map_hmn_url = base_url + 'system/route_maps/{0}/route_map_entries'.format(name)
-        response = remote_post(route_map_hmn_url, route_map_entry_hmn)
+        for name, ip in zip(ncn_names, ncn_can_ips):
+            route_map_can = "route-map {} permit 30 match ip address pl-can".format(name) 
+            cmd_list.append(route_map_can)
+            route_map_can_ip = "route-map {} permit 30 set ip next-hop {}".format(name, ip)
+            cmd_list.append(route_map_can_ip)
 
-    for ncn, name in zip(ncn_nmn_ips, ncn_names):
-        route_map_entry_nmn['set']['ipv4_next_hop_address'] = ncn
-        route_map_nmn_url = base_url + 'system/route_maps/{0}/route_map_entries'.format(name)
-        response = remote_post(route_map_nmn_url, route_map_entry_nmn)
+    #BGP commands
+    cmd_create_bgp = 'router bgp 65533 vrf default'
+    cmd_list.append(cmd_create_bgp)
+    cmd_bgp_routerid = 'router-id {} force'.format(spine)
+    cmd_list.append(cmd_bgp_routerid)
 
-    #add bgp asn and router id    
-    bgp_data['router_id'] = ips
-    bgp_router_id_url = base_url + 'system/vrfs/default/bgp_routers'
-    response = remote_post(bgp_router_id_url, bgp_data)
-    print('adding BGP configuration to {0}'.format(ips))
+    for ip, name in zip(ncn_nmn_ips, ncn_names):
+        cmd_bgp_neighbor = 'neighbor {} remote-as 65533'.format(ip)
+        cmd_list.append(cmd_bgp_neighbor)
+        cmd_bgp_route_map = 'neighbor {} route-map {}'.format(ip, name)
+        cmd_list.append(cmd_bgp_route_map)
 
-    #get switch firmware
-    firmware_url = base_url + 'firmware'
-    response = remote_get(firmware_url)
-    firmware = response.json()
+    commands = { "commands": cmd_list } 
 
-    #update BGP neighbors on firmware of 10.06
-    if '10.06' in firmware['current_version']:
-        for ncn, names in zip(ncn_nmn_ips, ncn_names):
-            bgp_neighbor10_06['ip_or_ifname_or_group_name'] = ncn 
-            bgp_neighbor_url = base_url + 'system/vrfs/default/bgp_routers/65533/bgp_neighbors'
-            bgp_neighbor10_06['route_maps']['ipv4-unicast']['in'] = '/rest/v10.04/system/route_maps/' + names
-            response = remote_post(bgp_neighbor_url, bgp_neighbor10_06)
-        for x in switch_ips:
-            if x != ips:
-                vsx_neighbor = dict(bgp_neighbor10_06)
-                vsx_neighbor['ip_or_ifname_or_group_name'] = x
-                del vsx_neighbor['route_maps']
-                response = remote_post(bgp_neighbor_url, vsx_neighbor)
+#post all the bgp configuration commands
+    response = session.post(url = login_url + action, json = commands, verify = False)
+    switch_response = json.loads(response.text)
+    pprint.pprint(switch_response)
 
-    #update BGP neighbors on firmware of 10.06
-    if '10.05' in firmware['current_version']:
-        for ncn, names in zip(ncn_nmn_ips, ncn_names):
-            bgp_neighbor10_05['ip_or_group_name'] = ncn 
-            bgp_neighbor_url = base_url + 'system/vrfs/default/bgp_routers/65533/bgp_neighbors'
-            bgp_neighbor10_05['route_maps']['ipv4-unicast']['in'] = '/rest/v10.04/system/route_maps/' + names
-            response = remote_post(bgp_neighbor_url, bgp_neighbor10_05)
-        for x in switch_ips:
-            if x != ips:
-                vsx_neighbor = dict(bgp_neighbor10_05)
-                vsx_neighbor['ip_or_group_name'] = x
-                del vsx_neighbor['route_maps']
-                response = remote_post(bgp_neighbor_url, vsx_neighbor)
-
-    write_mem_url = base_url + 'fullconfigs/startup-config?from=%2Frest%2Fv10.04%2Ffullconfigs%2Frunning-config'
-    response = remote_put(write_mem_url)
-    if response.status_code == 200:
-        print('Configuration saved on {}'.format(ips))
-
-    logout = session.post(f'https://{ips}/rest/v10.04/logout') #logout of switch
+    write_mem = { "cmd": "write memory" } 
+    response = session.post(url = login_url + action, json = write_mem, verify = False)
+    switch_response = json.loads(response.text)
+    pprint.pprint(switch_response)
 
 print('')
 print('')
