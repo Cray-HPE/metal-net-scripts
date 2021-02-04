@@ -35,7 +35,7 @@ try:
     switch1 = sys.argv[1]
     switch2 = sys.argv[2]
     path = os.path.join(sys.argv[3])
-    if os.path.exists(path) == False:
+    if not os.path.exists(path):
         print("Path provided not valid")
         print("")
         print(usage_message)
