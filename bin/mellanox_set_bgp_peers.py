@@ -157,9 +157,9 @@ for spine in switch_ips:
 
     response_body = json.loads(response.text)  # Convert JSON to python object
     if (
-        not response.text
-        or "status" not in response_body
-        or response_body["status"] != "OK"
+        not response.text or
+        "status" not in response_body or
+        response_body["status"] != "OK"
        ):
         print("Error {}".format(response.text))
         sys.exit()
