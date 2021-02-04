@@ -296,4 +296,3 @@ print("")
 print(
     "The BGP process may need to be restarted on the switches for all of them to become ESTABLISHED."
 )
-
