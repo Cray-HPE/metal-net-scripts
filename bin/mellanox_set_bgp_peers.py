@@ -155,14 +155,12 @@ for spine in switch_ips:
     )  # Do not verify self-signed certs
     response.raise_for_status()  # Throw an exception if HTTP response is not 200
 
-    response_body = json.loads(response.text)  # Convert JSON to python object
-    if (
-        not response.text or
-        "status" not in response_body or
-        response_body["status"] != "OK"
-       ):
-        print("Error {}".format(response.text))
-        sys.exit()
+	response_body = json.loads(response.text)  # Convert JSON to python object
+	if not response.text \
+        	or "status" not in response_body \
+        	or response_body["status"] != "OK":
+    	print("Error {}".format(response.text))
+    	sys.exit()
 
     # If the above passes then we're logged in and session cookie is available
     # NOTE:  technically the session cookie is still in our open requests session!
