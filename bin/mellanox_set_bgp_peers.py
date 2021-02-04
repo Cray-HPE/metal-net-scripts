@@ -160,7 +160,7 @@ for spine in switch_ips:
         not response.text
         or "status" not in response_body
         or response_body["status"] != "OK"
-    ):
+       ):
         print("Error {}".format(response.text))
         sys.exit()
 
