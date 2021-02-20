@@ -1,5 +1,5 @@
 // Copyright 2021 Hewlett Packard Enterprise Development LP
-@Library("dst-shared@release/shasta-1.4") _
+@Library("dst-shared@master") _
 rpmBuild(
     masterBranch: "main",
     specfile: "metal-net-scripts.spec",
