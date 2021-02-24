@@ -11,7 +11,6 @@ import getpass
 import logging
 import os
 import sys
-
 import requests
 import urllib3
 import yaml
