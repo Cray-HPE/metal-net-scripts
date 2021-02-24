@@ -11,7 +11,6 @@ import getpass
 import logging
 import os
 import sys
-
 import requests
 import urllib3
 import yaml
@@ -196,7 +195,8 @@ print('===============================================')
 # json payload
 bgp_data = {
     'asn': asn,
-    'router_id': ''
+    'router_id': '',
+    'maximum_paths': 8
 }
 
 bgp_neighbor10_05 = {
