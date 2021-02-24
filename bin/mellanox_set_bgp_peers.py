@@ -270,6 +270,8 @@ for spine in switch_ips:
         cmd_list.append(cmd_bgp_neighbor)
         cmd_bgp_route_map = "neighbor {} route-map {}".format(ip, name)
         cmd_list.append(cmd_bgp_route_map)
+    cmd_bgp_max = "maximum-paths ibgp 32"
+    cmd_list.append(cmd_bgp_max)
 
     commands = {"commands": cmd_list}
 
