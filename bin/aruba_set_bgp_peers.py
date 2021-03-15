@@ -444,8 +444,8 @@ for ips in switch_ips:
                 response = remote_post(bgp_neighbor_url, vsx_neighbor)
 
     write_mem_url = (
-        base_url
-        + "fullconfigs/startup-config?from=%2Frest%2Fv10.04%2Ffullconfigs%2Frunning-config"
+        base_url +
+        "fullconfigs/startup-config?from=%2Frest%2Fv10.04%2Ffullconfigs%2Frunning-config"
     )
     response = remote_put(write_mem_url)
     if response.status_code == 200:
