@@ -192,7 +192,11 @@ print("switch ips", " ".join(switch_ips))
 print("===============================================")
 
 # json payload
-bgp_data = {"asn": asn, "router_id": ""}
+bgp_data = {
+    'asn': asn,
+    'router_id': '',
+    'maximum_paths': 8
+}
 
 bgp_neighbor10_05 = {
     "ip_or_group_name": "",
