@@ -195,7 +195,8 @@ print("===============================================")
 bgp_data = {
     'asn': asn,
     'router_id': '',
-    'maximum_paths': 8
+    'maximum_paths': 8,
+    'ibgp_distance': 70
 }
 
 bgp_neighbor10_05 = {
@@ -356,7 +357,7 @@ for ips in switch_ips:
     for name in ncn_names:
         route_map_entry_tftp["preference"] = 10
         route_map_entry_tftp["set"]["local_preference"] = 1000
-        for ip in ncn_nmn_ips:
+        for ip in ncn_nmn_ips[:3]:
             route_map_can_url = (
                 base_url + "system/route_maps/{0}/route_map_entries".format(name)
             )
