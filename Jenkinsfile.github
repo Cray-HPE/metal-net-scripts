@@ -1,0 +1,42 @@
+@Library('csm-shared-library') _
+
+pipeline {
+  agent {
+    label "metal-gcp-builder"
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: "10"))
+    timestamps()
+  }
+
+  environment {
+    NAME = "metal-net-scripts"
+    DESCRIPTION = "Python scripts for network configuration and trouble-shooting"
+    IS_STABLE = getBuildIsStable()
+    BUILD_METADATA = getRpmRevision(isStable: env.IS_STABLE)
+  }
+
+  stages {
+    stage('Prepare') {
+      steps {
+        sh "make prepare"
+      }
+    }
+
+    stage('Rpm') {
+      steps {
+        sh "make rpm"
+      }
+    }
+
+    stage('Publish ') {
+      steps {
+        script {
+          publishCsmRpms(component: env.NAME, pattern: "dist/rpmbuild/RPMS/noarch/*.rpm", arch: "x86_64", isStable: env.IS_STABLE)
+          publishCsmRpms(component: env.NAME, pattern: "dist/rpmbuild/SRPMS/*.rpm", arch: "src", isStable: env.IS_STABLE)
+        }
+      }
+    }
+  }
+}
