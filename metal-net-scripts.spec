@@ -1,7 +1,7 @@
 # Copyright 2021 Hewlett Packard Enterprise Development LP
-
 %define install_dir /opt/cray/metal
 %define application /net-scripts
+%global __python /usr/bin/python3
 
 # This needs to be updated in-tandem to setup.py
 # since this depends on the CRAY's python3.
@@ -26,15 +26,15 @@ Vendor: Hewlett Packard Enterprise Development LP
 %setup -n %{name}-%{version}
 
 %build
-python3 setup.py build
+%{__python} setup.py build
 
 %install
-python3 setup.py install -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
+%{__python} setup.py install -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
 cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >> INSTALLED_FILES
 cat INSTALLED_FILES
 
 %clean
-python3 setup.py clean --all
+%{__python} setup.py clean --all
 
 %files -f INSTALLED_FILES
 %defattr(755,root,root)
