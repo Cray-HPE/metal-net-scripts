@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 # required commands to be run on switch prior to running this script.
 # ssh server vrf default
