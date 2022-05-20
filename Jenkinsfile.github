@@ -1,5 +1,6 @@
-@Library('csm-shared-library') _
+@Library('csm-shared-library@main') _
 
+def pythonVersion = '3.10'
 def isStable = env.TAG_NAME != null || env.BRANCH_NAME == 'main' ? true : false
 pipeline {
   agent {
@@ -8,6 +9,8 @@ pipeline {
 
   options {
     buildDiscarder(logRotator(numToKeepStr: "10"))
+    disableConcurrentBuilds()
+    timeout(time: 20, unit: 'MINUTES')
     timestamps()
   }
 
@@ -19,12 +22,27 @@ pipeline {
 
   stages {
     stage('Prepare') {
+      agent {
+        docker {
+          image "artifactory.algol60.net/csm-docker/stable/csm-docker-sle-python:${pythonVersion}"
+          reuseNode true
+          args "-v ${env.WORKSPACE}:/workspace"
+        }
+      }
       steps {
+        runLibraryScript("addRpmMetaData.sh", "${env.GIT_REPO_NAME}.spec")
         sh "make prepare"
       }
     }
 
     stage('Build: RPM') {
+      agent {
+        docker {
+          image "artifactory.algol60.net/csm-docker/stable/csm-docker-sle-python:${pythonVersion}"
+          reuseNode true
+          args "-v ${env.WORKSPACE}:/workspace"
+        }
+      }
       steps {
         sh "make rpm"
       }
@@ -33,8 +51,10 @@ pipeline {
     stage('Publish') {
       steps {
         script {
-          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/RPMS/noarch/*.rpm", arch: "noarch", isStable: isStable)
-          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/SRPMS/*.rpm", arch: "src", isStable: isStable)
+          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/RPMS/noarch/*.rpm", os: "sle-15sp2", arch: "noarch", isStable: isStable)
+          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/RPMS/noarch/*.rpm", os: "sle-15sp3", arch: "noarch", isStable: isStable)
+          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/SRPMS/*.rpm", os: "sle-15sp2", arch: "src", isStable: isStable)
+          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/SRPMS/*.rpm", os: "sle-15sp3", arch: "src", isStable: isStable)
         }
       }
     }
